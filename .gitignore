@@ -1,0 +1,65 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the ones you don't need)
+/vendor/
+/Godeps/
+/_vendor/
+/vendor.bak/
+/Godeps/_workspace/
+/_workspace/
+
+# Generated files
+*.app
+*.app/
+*.pkg
+*.pkg/
+*.exe
+*.exe/
+*.dll
+*.dll/
+*.so
+*.so/
+*.dylib
+*.dylib/
+/_obj/
+/_test/
+
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.h.gch
+*.l*
+
+# Compiled Go files
+*.6
+*.8
+*.5
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*.c
+_cgo_export.*.h
+
+# Swig files
+*.swig
+*.swigcxx
+*.swigc
+*.swigcxx
+*.swigcxx0
+*_wrap.c
