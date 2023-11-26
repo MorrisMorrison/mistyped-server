@@ -14,44 +14,12 @@ import (
 )
 
 var keyMap = map[string]string{
-	"q": "aw",
-	"w": "se",
-	"e": "dr",
-	"r": "ft",
-	"t": "gz",
-	"z": "hu",
-	"u": "ji",
-	"i": "ko",
-	"o": "lp",
-	"p": "öü",
-	"ü": "ä",
-	"a": "ys",
-	"s": "xd",
-	"d": "cf",
-	"f": "vg",
-	"g": "bh",
-	"h": "nj",
-	"j": "mk",
-	"k": "l",
-	"l": "ö",
-	"ö": "ä",
-	"ä": "",
-	"y": "sx",
-	"x": "dc",
-	"c": "fv",
-	"v": "gb",
-	"b": "hn",
-	"n": "jm",
-	"m": "k",
+	"q": "aw", "w": "se", "e": "dr", "r": "ft", "t": "gz", "z": "hu", "u": "ji", "i": "ko", "o": "lp", "p": "öü", "ü": "ä",
+	"a": "ys", "s": "xd", "d": "cf", "f": "vg", "g": "bh", "h": "nj", "j": "mk", "k": "l", "l": "ö", "ö": "ä", "ä": "",
+	"y": "sx", "x": "dc", "c": "fv", "v": "gb", "b": "hn", "n": "jm", "m": "k",
 }
 
 var port = 8080
-
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
 
 type CheckUrlResponse struct {
 	Available   []string `json:"Available"`
@@ -80,7 +48,10 @@ func handleCheckUrl(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	err := r.ParseForm()
-	check(err)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	inputUrl := r.Form.Get("url")
 	if !isUrlValid(inputUrl) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -90,9 +61,7 @@ func handleCheckUrl(w http.ResponseWriter, r *http.Request) {
 	cleanInputUrl := getCleanUrl(inputUrl)
 	candidates := getCandidates(cleanInputUrl)
 
-	c1 := make(chan []string)
-	c2 := make(chan []string)
-	go checkUrlAvailability(c1, c2, candidates)
+	c1, c2 := checkUrlAvailability(candidates)
 	availableCandidates := <-c1
 	unavailableCandidates := <-c2
 
@@ -108,27 +77,33 @@ func handleCheckUrl(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func checkUrlAvailability(c1 chan []string, c2 chan []string, candidates []string) {
-	fmt.Println("START GOROUTINE CheckUrlAvailability")
-	availableCandidates := make([]string, 0)
-	unavailableCandidates := make([]string, 0)
+func checkUrlAvailability(candidates []string) (chan []string, chan []string) {
+	c1 := make(chan []string)
+	c2 := make(chan []string)
 
-	for _, candidate := range candidates {
-		client := http.Client{
-			Timeout: 1 * time.Second,
-		}
-		res, err := client.Get(candidate)
-		if err == nil && res != nil && (res.StatusCode == 200 || res.StatusCode == 204 || res.StatusCode == 403) {
-			availableCandidates = append(availableCandidates, candidate)
-		} else {
-			unavailableCandidates = append(unavailableCandidates, candidate)
-		}
-	}
-	c1 <- availableCandidates
-	c2 <- unavailableCandidates
+	go func() {
+		fmt.Println("START GOROUTINE CheckUrlAvailability")
+		availableCandidates := make([]string, 0)
+		unavailableCandidates := make([]string, 0)
 
-	close(c1)
-	close(c2)
+		for _, candidate := range candidates {
+			client := http.Client{Timeout: 1 * time.Second}
+			res, err := client.Get(candidate)
+			if err == nil && res != nil && (res.StatusCode == 200 || res.StatusCode == 204 || res.StatusCode == 403) {
+				availableCandidates = append(availableCandidates, candidate)
+			} else {
+				unavailableCandidates = append(unavailableCandidates, candidate)
+			}
+		}
+
+		c1 <- availableCandidates
+		c2 <- unavailableCandidates
+
+		close(c1)
+		close(c2)
+	}()
+
+	return c1, c2
 }
 
 func getCandidates(inputUrl string) []string {
