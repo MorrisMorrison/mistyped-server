@@ -59,17 +59,11 @@ type CheckUrlResponse struct {
 }
 
 func main() {
-
 	handleRequests()
-}
-
-func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("ENDPOINT HOMEPAGE")
 }
 
 func handleRequests() {
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", homePage)
 	router.HandleFunc("/checkurl/", handleCheckUrl)
 	portString := ":" + strconv.Itoa(port)
 	fmt.Println("mistyped-server up and running on port", portString)
@@ -77,6 +71,9 @@ func handleRequests() {
 }
 
 func handleCheckUrl(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("ENDPOINT CHECKURL")
+	fmt.Println("Request:", r)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,POST, PUT")
@@ -84,12 +81,14 @@ func handleCheckUrl(w http.ResponseWriter, r *http.Request) {
 
 	err := r.ParseForm()
 	check(err)
-	url := r.Form.Get("url")
-	if !isUrlValid(url) {
+	inputUrl := r.Form.Get("url")
+	if !isUrlValid(inputUrl) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	candidates := getCandidates(url)
+
+	cleanInputUrl := getCleanUrl(inputUrl)
+	candidates := getCandidates(cleanInputUrl)
 
 	c1 := make(chan []string)
 	c2 := make(chan []string)
@@ -116,7 +115,7 @@ func checkUrlAvailability(c1 chan []string, c2 chan []string, candidates []strin
 
 	for _, candidate := range candidates {
 		client := http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: 1 * time.Second,
 		}
 		res, err := client.Get(candidate)
 		if err == nil && res != nil && (res.StatusCode == 200 || res.StatusCode == 204 || res.StatusCode == 403) {
@@ -132,17 +131,24 @@ func checkUrlAvailability(c1 chan []string, c2 chan []string, candidates []strin
 	close(c2)
 }
 
-func getCandidates(url string) []string {
+func getCandidates(inputUrl string) []string {
 	candidates := make([]string, 0)
-	urlSplit := strings.Split(url, ".")
-	hostName := urlSplit[1]
-	for _, urlCharacter := range urlSplit[1] {
+	urlSplit := strings.Split(inputUrl, ".")
+	var hostPosition int
+	if len(urlSplit) > 2 {
+		hostPosition = 1
+	} else {
+		hostPosition = 0
+	}
+	hostname := urlSplit[hostPosition]
+
+	for _, urlCharacter := range urlSplit[hostPosition] {
 		for _, possibleCharacters := range keyMap[string(urlCharacter)] {
 			for _, possibleCharacter := range string(possibleCharacters) {
-				possibleHostName := replace(hostName, string(urlCharacter), string(possibleCharacter))
-				urlSplit[1] = possibleHostName
+				possibleHostName := replace(hostname, string(urlCharacter), string(possibleCharacter))
+				urlSplit[hostPosition] = possibleHostName
 				possibleUrl := getString(urlSplit)
-				candidates = append(candidates, possibleUrl)
+				candidates = append(candidates, "http://"+possibleUrl)
 			}
 		}
 	}
@@ -175,7 +181,24 @@ func getString(stringArray []string) string {
 	return result
 }
 
+func getCleanUrl(inputUrl string) string {
+	url := strings.TrimPrefix(inputUrl, "https://")
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "www.")
+	url = strings.Split(url, "/")[0]
+	url = strings.TrimSuffix(url, "/")
+	return url
+}
+
 func isUrlValid(u string) bool {
-	_, err := url.ParseRequestURI(u)
+	var err error
+
+	if len(strings.Split(u, ".")) <= 2 {
+		_, err = url.Parse("http://www." + u)
+	} else {
+		_, err = url.Parse(u)
+	}
+
+	fmt.Println(err)
 	return err == nil
 }
